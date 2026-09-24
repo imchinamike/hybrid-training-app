@@ -27,14 +27,27 @@ type RawPrescription = {
   rest_seconds: number | null;
   exercise_order: number | null;
 
-  workout_components: {
-    title: string;
-    component_order: number | null;
-  } | null;
+  workout_components:
+    | {
+        title: string;
+        component_order: number | null;
+        planned_workout_id: number;
+      }
+    | {
+        title: string;
+        component_order: number | null;
+        planned_workout_id: number;
+      }[]
+    | null;
 
-  exercises: {
-    name: string;
-  } | null;
+  exercises:
+    | {
+        name: string;
+      }
+    | {
+        name: string;
+      }[]
+    | null;
 };
 
 type ReadinessCheckin = {
@@ -200,26 +213,42 @@ export default function ModifyWorkoutPage() {
       }
 
       const rawPrescriptions =
-        (prescriptionData as RawPrescription[] | null) ?? [];
+        (prescriptionData as unknown as
+          | RawPrescription[]
+          | null) ?? [];
 
       const mappedPrescriptions: ExercisePrescriptionInput[] =
-        rawPrescriptions.map((item) => ({
-          id: item.id,
-          exerciseName:
-            item.exercises?.name ?? "Exercise",
-          componentName:
-            item.workout_components?.title ?? "Workout",
-          componentOrder:
-            item.workout_components?.component_order ?? 0,
-          exerciseOrder:
-            item.exercise_order ?? 0,
-          sets: item.sets,
-          repsMin: item.reps_min,
-          repsMax: item.reps_max,
-          targetRpeMin: item.target_rpe_min,
-          targetRpeMax: item.target_rpe_max,
-          restSeconds: item.rest_seconds,
-        }));
+        rawPrescriptions.map((item) => {
+          const component = Array.isArray(
+            item.workout_components
+          )
+            ? item.workout_components[0] ?? null
+            : item.workout_components;
+
+          const exercise = Array.isArray(
+            item.exercises
+          )
+            ? item.exercises[0] ?? null
+            : item.exercises;
+
+          return {
+            id: item.id,
+            exerciseName:
+              exercise?.name ?? "Exercise",
+            componentName:
+              component?.title ?? "Workout",
+            componentOrder:
+              component?.component_order ?? 0,
+            exerciseOrder:
+              item.exercise_order ?? 0,
+            sets: item.sets,
+            repsMin: item.reps_min,
+            repsMax: item.reps_max,
+            targetRpeMin: item.target_rpe_min,
+            targetRpeMax: item.target_rpe_max,
+            restSeconds: item.rest_seconds,
+          };
+        });
 
       if (mappedPrescriptions.length === 0) {
         setErrorMessage(
