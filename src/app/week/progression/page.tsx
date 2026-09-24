@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import {
+  Suspense,
   useEffect,
   useMemo,
   useState,
@@ -261,7 +262,7 @@ function getActionClasses(
   }
 }
 
-export default function ProgressionPreviewPage() {
+function ProgressionPreviewContent() {
   const searchParams =
     useSearchParams();
 
@@ -1824,3 +1825,22 @@ export default function ProgressionPreviewPage() {
     </main>
   );
 }
+
+export default function ProgressionPreviewPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-zinc-950 px-4 pb-20 pt-8 text-zinc-100">
+          <div className="mx-auto w-full max-w-md">
+            <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 text-sm text-zinc-500">
+              Loading progression preview...
+            </div>
+          </div>
+        </main>
+      }
+    >
+      <ProgressionPreviewContent />
+    </Suspense>
+  );
+}
+
