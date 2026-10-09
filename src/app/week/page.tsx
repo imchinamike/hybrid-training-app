@@ -1,9 +1,7 @@
 "use client";
-
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
-
 type TrainingBlock = {
   id: number;
   name: string;
@@ -12,7 +10,6 @@ type TrainingBlock = {
   status: string;
   phase: string | null;
 };
-
 type TrainingWeek = {
   id: number;
   training_block_id: number;
@@ -25,7 +22,6 @@ type TrainingWeek = {
   week_emphasis: string | null;
   notes: string | null;
 };
-
 type Workout = {
   id: number;
   training_week_id: number | null;
@@ -37,7 +33,6 @@ type Workout = {
   estimated_duration_min: number | null;
   status: string;
 };
-
 const WEEK_DAYS = [
   "Sunday",
   "Monday",
@@ -47,11 +42,9 @@ const WEEK_DAYS = [
   "Friday",
   "Saturday",
 ];
-
 function formatWorkoutType(value: string) {
   return value.replaceAll("_", " ");
 }
-
 function formatDate(dateString: string) {
   return new Date(
     `${dateString}T12:00:00`
@@ -63,7 +56,6 @@ function formatDate(dateString: string) {
     }
   );
 }
-
 function formatLongDate(dateString: string) {
   return new Date(
     `${dateString}T12:00:00`
@@ -76,7 +68,6 @@ function formatLongDate(dateString: string) {
     }
   );
 }
-
 function addDays(
   dateString: string,
   days: number
@@ -84,25 +75,19 @@ function addDays(
   const date = new Date(
     `${dateString}T12:00:00`
   );
-
   date.setDate(
     date.getDate() + days
   );
-
   const year =
     date.getFullYear();
-
   const month = String(
     date.getMonth() + 1
   ).padStart(2, "0");
-
   const day = String(
     date.getDate()
   ).padStart(2, "0");
-
   return `${year}-${month}-${day}`;
 }
-
 function getPacificDateString() {
   return new Date().toLocaleDateString(
     "en-CA",
@@ -112,7 +97,6 @@ function getPacificDateString() {
     }
   );
 }
-
 export default function WeekPage() {
   const [
     trainingBlock,
@@ -121,13 +105,11 @@ export default function WeekPage() {
     useState<TrainingBlock | null>(
       null
     );
-
   const [
     trainingWeeks,
     setTrainingWeeks,
   ] =
     useState<TrainingWeek[]>([]);
-
   const [
     selectedWeekId,
     setSelectedWeekId,
@@ -135,37 +117,30 @@ export default function WeekPage() {
     useState<number | null>(
       null
     );
-
   const [
     workouts,
     setWorkouts,
   ] =
     useState<Workout[]>([]);
-
   const [
     loading,
     setLoading,
   ] =
     useState(true);
-
   const [
     errorMessage,
     setErrorMessage,
   ] =
     useState("");
-
   const [
     generatingWeek,
     setGeneratingWeek,
   ] =
     useState(false);
-
-
   useEffect(() => {
     async function loadProgram() {
       setLoading(true);
       setErrorMessage("");
-
       /*
        * Athlete
        */
@@ -177,7 +152,6 @@ export default function WeekPage() {
         .select("id")
         .eq("name", "Mike")
         .single();
-
       if (
         athleteError ||
         !athleteData
@@ -186,11 +160,9 @@ export default function WeekPage() {
           athleteError?.message ??
             "Could not find athlete."
         );
-
         setLoading(false);
         return;
       }
-
       /*
        * Active training block
        */
@@ -222,32 +194,25 @@ export default function WeekPage() {
         )
         .limit(1)
         .maybeSingle();
-
       if (blockError) {
         setErrorMessage(
           blockError.message
         );
-
         setLoading(false);
         return;
       }
-
       if (!blockData) {
         setErrorMessage(
           "No active training block was found."
         );
-
         setLoading(false);
         return;
       }
-
       const loadedBlock =
         blockData as TrainingBlock;
-
       setTrainingBlock(
         loadedBlock
       );
-
       /*
        * Training weeks
        */
@@ -280,32 +245,26 @@ export default function WeekPage() {
             ascending: true,
           }
         );
-
       if (weekError) {
         setErrorMessage(
           weekError.message
         );
-
         setLoading(false);
         return;
       }
-
       const loadedWeeks =
         (weekData as
           | TrainingWeek[]
           | null) ?? [];
-
       setTrainingWeeks(
         loadedWeeks
       );
-
       if (
         loadedWeeks.length === 0
       ) {
         setLoading(false);
         return;
       }
-
       /*
        * Workouts for all currently-created weeks
        */
@@ -313,7 +272,6 @@ export default function WeekPage() {
         loadedWeeks.map(
           (week) => week.id
         );
-
       const {
         data: workoutData,
         error: workoutError,
@@ -350,22 +308,18 @@ export default function WeekPage() {
             ascending: true,
           }
         );
-
       if (workoutError) {
         setErrorMessage(
           workoutError.message
         );
-
         setLoading(false);
         return;
       }
-
       setWorkouts(
         (workoutData as
           | Workout[]
           | null) ?? []
       );
-
       /*
        * Choose the most relevant week.
        *
@@ -376,7 +330,6 @@ export default function WeekPage() {
        */
       const today =
         getPacificDateString();
-
       const currentWeek =
         loadedWeeks.find(
           (week) => {
@@ -385,7 +338,6 @@ export default function WeekPage() {
                 week.start_date,
                 6
               );
-
             return (
               today >=
                 week.start_date &&
@@ -394,7 +346,6 @@ export default function WeekPage() {
             );
           }
         );
-
       if (currentWeek) {
         setSelectedWeekId(
           currentWeek.id
@@ -406,7 +357,6 @@ export default function WeekPage() {
               week.start_date <=
               today
           );
-
         const mostRecent =
           pastWeeks.length > 0
             ? pastWeeks[
@@ -414,18 +364,14 @@ export default function WeekPage() {
                   1
               ]
             : loadedWeeks[0];
-
         setSelectedWeekId(
           mostRecent.id
         );
       }
-
       setLoading(false);
     }
-
     loadProgram();
   }, []);
-
   const selectedWeek =
     useMemo(() => {
       if (
@@ -433,7 +379,6 @@ export default function WeekPage() {
       ) {
         return null;
       }
-
       return (
         trainingWeeks.find(
           (week) =>
@@ -445,13 +390,11 @@ export default function WeekPage() {
       selectedWeekId,
       trainingWeeks,
     ]);
-
   const selectedWeekIndex =
     useMemo(() => {
       if (!selectedWeek) {
         return -1;
       }
-
       return trainingWeeks.findIndex(
         (week) =>
           week.id ===
@@ -461,13 +404,11 @@ export default function WeekPage() {
       selectedWeek,
       trainingWeeks,
     ]);
-
   const selectedWeekWorkouts =
     useMemo(() => {
       if (!selectedWeek) {
         return [];
       }
-
       return workouts.filter(
         (workout) =>
           workout.training_week_id ===
@@ -477,13 +418,11 @@ export default function WeekPage() {
       workouts,
       selectedWeek,
     ]);
-
   const weekDays =
     useMemo(() => {
       if (!selectedWeek) {
         return [];
       }
-
       return Array.from(
         {
           length: 7,
@@ -494,20 +433,16 @@ export default function WeekPage() {
               selectedWeek.start_date,
               index
             );
-
           const date =
             new Date(
               `${dateString}T12:00:00`
             );
-
           return {
             dateString,
-
             name:
               WEEK_DAYS[
                 date.getDay()
               ],
-
             workouts:
               selectedWeekWorkouts.filter(
                 (workout) =>
@@ -521,17 +456,14 @@ export default function WeekPage() {
       selectedWeek,
       selectedWeekWorkouts,
     ]);
-
   const todayDate =
     getPacificDateString();
-
   const completedCount =
     selectedWeekWorkouts.filter(
       (workout) =>
         workout.status ===
         "completed"
     ).length;
-
   const weekEndDate =
     selectedWeek
       ? addDays(
@@ -539,15 +471,12 @@ export default function WeekPage() {
           6
         )
       : null;
-
   const canGoPrevious =
     selectedWeekIndex > 0;
-
   const canGoNext =
     selectedWeekIndex >= 0 &&
     selectedWeekIndex <
       trainingWeeks.length - 1;
-
   const existingNextWeek =
     selectedWeek
       ? trainingWeeks.find(
@@ -556,31 +485,26 @@ export default function WeekPage() {
             selectedWeek.week_number + 1
         ) ?? null
       : null;
-
   function goPreviousWeek() {
     if (!canGoPrevious) {
       return;
     }
-
     setSelectedWeekId(
       trainingWeeks[
         selectedWeekIndex - 1
       ].id
     );
   }
-
   function goNextWeek() {
     if (!canGoNext) {
       return;
     }
-
     setSelectedWeekId(
       trainingWeeks[
         selectedWeekIndex + 1
       ].id
     );
   }
-
   async function generateNextWeek() {
     if (
       !selectedWeek ||
@@ -588,21 +512,18 @@ export default function WeekPage() {
     ) {
       return;
     }
-
     setGeneratingWeek(true);
     setErrorMessage("");
-
     const {
       data,
       error,
     } = await supabase.rpc(
-      "generate_next_training_week",
+      "generate_base_training_week",
       {
         p_source_week_id:
           selectedWeek.id,
       }
     );
-
     if (error) {
       setErrorMessage(
         error.message
@@ -610,10 +531,8 @@ export default function WeekPage() {
       setGeneratingWeek(false);
       return;
     }
-
     const generatedWeekId =
       Number(data);
-
     const {
       data: generatedWeekData,
       error: generatedWeekError,
@@ -638,7 +557,6 @@ export default function WeekPage() {
         generatedWeekId
       )
       .single();
-
     if (
       generatedWeekError ||
       !generatedWeekData
@@ -650,10 +568,8 @@ export default function WeekPage() {
       setGeneratingWeek(false);
       return;
     }
-
     const nextWeek =
       generatedWeekData as TrainingWeek;
-
     const {
       data: generatedWorkoutData,
       error: generatedWorkoutError,
@@ -688,7 +604,6 @@ export default function WeekPage() {
           ascending: true,
         }
       );
-
     if (generatedWorkoutError) {
       setErrorMessage(
         generatedWorkoutError.message
@@ -696,7 +611,6 @@ export default function WeekPage() {
       setGeneratingWeek(false);
       return;
     }
-
     setTrainingWeeks(
       (currentWeeks) => {
         const exists =
@@ -705,7 +619,6 @@ export default function WeekPage() {
               week.id ===
               nextWeek.id
           );
-
         const updated =
           exists
             ? currentWeeks.map(
@@ -719,7 +632,6 @@ export default function WeekPage() {
                 ...currentWeeks,
                 nextWeek,
               ];
-
         return updated.sort(
           (a, b) =>
             a.week_number -
@@ -727,7 +639,6 @@ export default function WeekPage() {
         );
       }
     );
-
     setWorkouts(
       (currentWorkouts) => [
         ...currentWorkouts.filter(
@@ -740,14 +651,11 @@ export default function WeekPage() {
           | null) ?? [])),
       ]
     );
-
     setSelectedWeekId(
       generatedWeekId
     );
-
     setGeneratingWeek(false);
   }
-
   function handleNextWeekAction() {
     if (existingNextWeek) {
       setSelectedWeekId(
@@ -755,10 +663,8 @@ export default function WeekPage() {
       );
       return;
     }
-
     generateNextWeek();
   }
-
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <main className="mx-auto w-full max-w-md px-4 pb-28 pt-8">
@@ -767,7 +673,6 @@ export default function WeekPage() {
           <p className="text-[10px] font-medium uppercase tracking-widest text-emerald-400">
             Training plan
           </p>
-
           <div className="mt-2 flex items-start justify-between gap-4">
             <div>
               <h1 className="text-3xl font-semibold tracking-tight">
@@ -775,7 +680,6 @@ export default function WeekPage() {
                   ? `Week ${selectedWeek.week_number}`
                   : "Week"}
               </h1>
-
               {trainingBlock && (
                 <p className="mt-2 text-sm text-zinc-500">
                   {
@@ -784,7 +688,6 @@ export default function WeekPage() {
                 </p>
               )}
             </div>
-
             {trainingBlock?.phase && (
               <span className="max-w-[150px] rounded-lg bg-zinc-900 px-2 py-1 text-right text-[9px] font-medium uppercase tracking-wide text-zinc-500">
                 {
@@ -793,7 +696,6 @@ export default function WeekPage() {
               </span>
             )}
           </div>
-
           {selectedWeek &&
             weekEndDate && (
               <div className="mt-4 flex items-center justify-between">
@@ -806,7 +708,6 @@ export default function WeekPage() {
                     weekEndDate
                   )}
                 </p>
-
                 {!loading && (
                   <p className="text-xs text-zinc-500">
                     {
@@ -822,7 +723,6 @@ export default function WeekPage() {
               </div>
             )}
         </header>
-
         {errorMessage && (
           <div className="mb-6 rounded-xl border border-red-900 bg-red-950/40 p-4">
             <p className="text-sm text-red-400">
@@ -830,13 +730,11 @@ export default function WeekPage() {
             </p>
           </div>
         )}
-
         {loading && (
           <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 text-sm text-zinc-500">
             Loading training plan...
           </div>
         )}
-
         {!loading &&
           trainingWeeks.length ===
             0 && (
@@ -844,7 +742,6 @@ export default function WeekPage() {
               <h2 className="text-lg font-semibold">
                 No training weeks
               </h2>
-
               <p className="mt-2 text-sm leading-6 text-zinc-500">
                 This training block
                 does not have any
@@ -852,7 +749,6 @@ export default function WeekPage() {
               </p>
             </div>
           )}
-
         {!loading &&
           selectedWeek && (
             <>
@@ -864,7 +760,6 @@ export default function WeekPage() {
                       const isSelected =
                         week.id ===
                         selectedWeek.id;
-
                       return (
                         <button
                           key={
@@ -892,7 +787,6 @@ export default function WeekPage() {
                   )}
                 </div>
               </section>
-
               {/* Week navigation */}
               <section className="mb-5 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
                 <button
@@ -907,19 +801,16 @@ export default function WeekPage() {
                 >
                   ← Previous
                 </button>
-
                 <div className="text-center">
                   <p className="text-[9px] uppercase tracking-widest text-zinc-600">
                     Week
                   </p>
-
                   <p className="mt-1 text-sm font-semibold">
                     {
                       selectedWeek.week_number
                     }
                   </p>
                 </div>
-
                 <button
                   type="button"
                   onClick={
@@ -933,7 +824,6 @@ export default function WeekPage() {
                   Next →
                 </button>
               </section>
-
               {/* Progression review */}
               {selectedWeek.week_number >= 2 && (
                 <section className="mb-5">
@@ -945,29 +835,24 @@ export default function WeekPage() {
                       <p className="text-[9px] font-semibold uppercase tracking-widest text-emerald-400">
                         Strength progression
                       </p>
-
                       <h2 className="mt-1 text-sm font-semibold text-zinc-100">
                         Review progression
                       </h2>
-
                       <p className="mt-1 text-xs leading-5 text-zinc-500">
-                        Compare the prior week&apos;s real training with this week&apos;s strength prescriptions.
+                        Compare the prior week's real training with this week's strength prescriptions.
                       </p>
                     </div>
-
                     <span className="ml-4 text-xl text-emerald-500">
                       ›
                     </span>
                   </Link>
                 </section>
               )}
-
               {/* Next week planning */}
               <section className="mb-5 rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
                 <p className="text-[9px] font-semibold uppercase tracking-widest text-zinc-500">
                   Weekly planning
                 </p>
-
                 <div className="mt-2">
                   <h2 className="text-sm font-semibold text-zinc-100">
                     {existingNextWeek
@@ -977,14 +862,12 @@ export default function WeekPage() {
                           1
                         }`}
                   </h2>
-
                   <p className="mt-1 text-xs leading-5 text-zinc-500">
                     {existingNextWeek
                       ? "The next week already exists. Open it to review the schedule and strength progression."
-                      : "Copy this week forward, keep PT/cardio unchanged, and prepare the next week for progression review."}
+                      : "Build your next week with progressive easy running, recovery weeks, and continued strength training."}
                   </p>
                 </div>
-
                 <button
                   type="button"
                   onClick={
@@ -1009,7 +892,6 @@ export default function WeekPage() {
                       }`}
                 </button>
               </section>
-
               {/* Week emphasis */}
               {(selectedWeek.week_emphasis ||
                 selectedWeek.notes) && (
@@ -1017,7 +899,6 @@ export default function WeekPage() {
                   <p className="text-[9px] font-semibold uppercase tracking-widest text-emerald-400">
                     Week emphasis
                   </p>
-
                   {selectedWeek.week_emphasis && (
                     <h2 className="mt-2 text-base font-semibold">
                       {
@@ -1025,7 +906,6 @@ export default function WeekPage() {
                       }
                     </h2>
                   )}
-
                   {selectedWeek.notes && (
                     <p className="mt-2 text-xs leading-5 text-zinc-500">
                       {
@@ -1033,7 +913,6 @@ export default function WeekPage() {
                       }
                     </p>
                   )}
-
                   {(selectedWeek.planned_training_minutes !=
                     null ||
                     selectedWeek.planned_run_miles !=
@@ -1047,7 +926,6 @@ export default function WeekPage() {
                           <p className="text-[8px] uppercase tracking-wide text-zinc-600">
                             Training
                           </p>
-
                           <p className="mt-1 text-xs font-medium">
                             {
                               selectedWeek.planned_training_minutes
@@ -1056,14 +934,12 @@ export default function WeekPage() {
                           </p>
                         </div>
                       )}
-
                       {selectedWeek.planned_run_miles !=
                         null && (
                         <div className="rounded-lg bg-zinc-950 px-3 py-2">
                           <p className="text-[8px] uppercase tracking-wide text-zinc-600">
                             Running
                           </p>
-
                           <p className="mt-1 text-xs font-medium">
                             {
                               selectedWeek.planned_run_miles
@@ -1072,14 +948,12 @@ export default function WeekPage() {
                           </p>
                         </div>
                       )}
-
                       {selectedWeek.planned_vertical_ft !=
                         null && (
                         <div className="rounded-lg bg-zinc-950 px-3 py-2">
                           <p className="text-[8px] uppercase tracking-wide text-zinc-600">
                             Vertical
                           </p>
-
                           <p className="mt-1 text-xs font-medium">
                             {
                               selectedWeek.planned_vertical_ft
@@ -1092,7 +966,6 @@ export default function WeekPage() {
                   )}
                 </section>
               )}
-
               {/* Empty programming week */}
               {selectedWeekWorkouts.length ===
                 0 && (
@@ -1100,11 +973,9 @@ export default function WeekPage() {
                   <p className="text-[9px] font-semibold uppercase tracking-widest text-zinc-500">
                     Programming week
                   </p>
-
                   <h2 className="mt-2 text-lg font-semibold">
                     No workouts planned yet
                   </h2>
-
                   <p className="mt-2 text-sm leading-6 text-zinc-500">
                     Week{" "}
                     {
@@ -1116,7 +987,6 @@ export default function WeekPage() {
                     not been programmed
                     yet.
                   </p>
-
                   <p className="mt-3 text-xs text-zinc-600">
                     {formatLongDate(
                       selectedWeek.start_date
@@ -1131,7 +1001,6 @@ export default function WeekPage() {
                   </p>
                 </section>
               )}
-
               {/* Days */}
               <div className="space-y-5">
                 {weekDays.map(
@@ -1139,7 +1008,6 @@ export default function WeekPage() {
                     const isToday =
                       day.dateString ===
                       todayDate;
-
                     return (
                       <section
                         key={
@@ -1160,21 +1028,18 @@ export default function WeekPage() {
                                 day.name
                               }
                             </h2>
-
                             {isToday && (
                               <span className="rounded bg-emerald-950 px-2 py-0.5 text-[9px] font-medium uppercase text-emerald-400">
                                 Today
                               </span>
                             )}
                           </div>
-
                           <p className="text-xs text-zinc-600">
                             {formatDate(
                               day.dateString
                             )}
                           </p>
                         </div>
-
                         {/* Empty day */}
                         {day.workouts
                           .length ===
@@ -1186,7 +1051,6 @@ export default function WeekPage() {
                             </p>
                           </div>
                         )}
-
                         {/* Workout cards */}
                         <div className="space-y-2">
                           {day.workouts.map(
@@ -1196,7 +1060,6 @@ export default function WeekPage() {
                               const isCompleted =
                                 workout.status ===
                                 "completed";
-
                               return (
                                 <Link
                                   key={
@@ -1233,14 +1096,12 @@ export default function WeekPage() {
                                             }
                                           </span>
                                         )}
-
                                         <span className="text-[10px] text-zinc-500">
                                           {
                                             workout.priority_level
                                           }{" "}
                                           priority
                                         </span>
-
                                         {workout.estimated_duration_min !=
                                           null && (
                                           <span className="text-[10px] text-zinc-500">
@@ -1251,7 +1112,6 @@ export default function WeekPage() {
                                           </span>
                                         )}
                                       </div>
-
                                       <h3
                                         className={`mt-3 text-base font-semibold ${
                                           isCompleted
@@ -1263,14 +1123,12 @@ export default function WeekPage() {
                                           workout.name
                                         }
                                       </h3>
-
                                       <p className="mt-1 text-xs capitalize text-zinc-500">
                                         {formatWorkoutType(
                                           workout.workout_type
                                         )}
                                       </p>
                                     </div>
-
                                     <div className="pt-1">
                                       {isCompleted ? (
                                         <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 text-xs font-bold text-zinc-950">
@@ -1296,7 +1154,6 @@ export default function WeekPage() {
             </>
           )}
       </main>
-
       {/* Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 border-t border-zinc-800 bg-zinc-950/95 backdrop-blur">
         <div className="mx-auto grid max-w-md grid-cols-4 px-2 py-2">
@@ -1309,7 +1166,6 @@ export default function WeekPage() {
               Today
             </span>
           </Link>
-
           <Link
             href="/week"
             className="flex flex-col items-center gap-1 py-2 text-xs text-emerald-400"
@@ -1319,7 +1175,6 @@ export default function WeekPage() {
               Week
             </span>
           </Link>
-
           <Link
             href="/history"
             className="flex flex-col items-center gap-1 py-2 text-xs text-zinc-500"
@@ -1329,7 +1184,6 @@ export default function WeekPage() {
               History
             </span>
           </Link>
-
           <button className="flex flex-col items-center gap-1 py-2 text-xs text-zinc-500">
             <span>•••</span>
             <span>
