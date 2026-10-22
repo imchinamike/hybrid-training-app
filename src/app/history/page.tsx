@@ -855,10 +855,10 @@ export default function HistoryPage() {
             <span>◉</span>
             <span>History</span>
           </Link>
-          <button className="flex flex-col items-center gap-1 py-2 text-xs text-zinc-500">
-            <span>•••</span>
-            <span>More</span>
-          </button>
+          <Link href="/analytics" className="flex flex-col items-center gap-1 py-2 text-xs text-zinc-500">
+            <span>▥</span>
+            <span>Analytics</span>
+          </Link>
         </div>
       </nav>
     </div>

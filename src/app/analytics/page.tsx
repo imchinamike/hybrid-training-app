@@ -272,6 +272,9 @@ export default function AnalyticsPage() {
     return selectionIndex < 0 ? [] : allWeeks.slice(Math.max(0, selectionIndex - 3), selectionIndex + 1);
   }, [allWeeks, selected]);
   const maxMiles = Math.max(1, ...visibleWeeks.map((week) => week.runMiles + week.rehabMiles));
+  const maxVert = Math.max(1, ...visibleWeeks.map((week) => week.runVertFt + week.footVertFt));
+  const selectedFootVert = (selected?.runVertFt ?? 0) + (selected?.footVertFt ?? 0);
+  const fourWeekBikeVert = fourWeeks.reduce((sum, week) => sum + week.bikeVertFt, 0);
   const fourWeekMiles = fourWeeks.reduce((sum, week) => sum + week.runMiles, 0);
   const fourWeekRehab = fourWeeks.reduce((sum, week) => sum + week.rehabMiles, 0);
   const fourWeekVert = fourWeeks.reduce((sum, week) => sum + week.runVertFt + week.footVertFt, 0);
@@ -298,7 +301,7 @@ export default function AnalyticsPage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <Stat label="Running miles" value={`${fmt(selected.runMiles)} mi`} note={selected.plannedMiles != null ? `${fmt(selected.plannedMiles)} mi planned` : "Continuous running"} />
-              <Stat label="Running vertical" value={`${fmt(selected.runVertFt, 0)} ft`} note="Includes run/walk climbing" />
+              <Stat label="Climbing on foot" value={`${fmt(selectedFootVert, 0)} ft`} note="Running + rehab + hiking/walking" />
               <Stat label="Aerobic time" value={asHoursMinutes(selected.aerobicSeconds)} note="Running + walking + cycling + other" />
               <Stat label="Longest run" value={`${fmt(selected.longestRun)} mi`} note={selected.longestRehab > 0 ? `Longest rehab run/walk: ${fmt(selected.longestRehab)} mi` : "Longest continuous run"} />
             </div>
@@ -308,7 +311,7 @@ export default function AnalyticsPage() {
               <div className="mt-3 space-y-2 text-xs">
                 <div className="flex justify-between text-zinc-400"><span>Rehab run/walk</span><span>{fmt(selected.rehabMiles)} mi</span></div>
                 <div className="flex justify-between text-zinc-400"><span>Walking / hiking</span><span>{fmt(selected.footMiles)} mi · {fmt(selected.footVertFt, 0)} ft climbed</span></div>
-                <div className="flex justify-between text-zinc-400"><span>Cycling</span><span>{fmt(selected.bikeMiles)} mi · {asHoursMinutes(selected.bikeSeconds)}</span></div>
+                <div className="flex justify-between text-zinc-400"><span>Cycling</span><span>{fmt(selected.bikeMiles)} mi · {asHoursMinutes(selected.bikeSeconds)} · {fmt(selected.bikeVertFt, 0)} ft vert</span></div>
                 <div className="flex justify-between text-zinc-400"><span>Running + run/walk time</span><span>{asHoursMinutes(selected.runningSeconds)}</span></div>
               </div>
               {selected.recordedVertCount === 0 && <p className="mt-3 text-xs leading-5 text-amber-400">No elevation measurements recorded for this week. Vertical totals show zero recorded, not necessarily zero climbed.</p>}
@@ -337,13 +340,41 @@ export default function AnalyticsPage() {
             </section>
 
             <section className="mt-4 rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
+              <h2 className="text-sm font-semibold">Vertical gain by week</h2>
+              <p className="mt-1 text-[11px] leading-5 text-zinc-500">Green: running and rehab. Gray: walking and hiking. Cycling climbing is reported separately and is not included in the bars.</p>
+              <div className="mt-5 space-y-3">
+                {visibleWeeks.map((week) => {
+                  const onFoot = week.runVertFt + week.footVertFt;
+                  return (
+                    <button
+                      key={week.start}
+                      type="button"
+                      onClick={() => setSelectedStart(week.start)}
+                      aria-label={`${shortDate(week.start)}: ${Math.round(onFoot)} feet of recorded climbing on foot`}
+                      className={`grid w-full grid-cols-[50px_1fr_64px] items-center gap-2 rounded-lg p-1 text-left ${selected.start === week.start ? "bg-zinc-800" : ""}`}
+                    >
+                      <span className="text-[11px] text-zinc-400">{shortDate(week.start)}</span>
+                      <div className="flex h-3 overflow-hidden rounded-sm bg-zinc-950">
+                        <div className="bg-emerald-500" style={{ width: `${week.runVertFt / maxVert * 100}%` }} />
+                        <div className="bg-zinc-500" style={{ width: `${week.footVertFt / maxVert * 100}%` }} />
+                      </div>
+                      <span className="text-right text-xs tabular-nums text-zinc-300">{week.recordedVertCount === 0 ? "—" : fmt(onFoot, 0)}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-4 text-[11px] text-zinc-500">A dash means elevation is unrecorded for the entire week; it does not mean zero climbing. Recorded totals may be incomplete when only some workouts have elevation.</p>
+            </section>
+
+            <section className="mt-4 rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
               <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Four weeks ending {shortDate(addDays(selected.start, 6))}</p>
               <div className="mt-3 grid grid-cols-2 gap-3">
                 <div><p className="text-xl font-semibold">{fmt(fourWeekMiles)} mi</p><p className="mt-1 text-xs text-zinc-500">Continuous running</p></div>
                 <div><p className="text-xl font-semibold">{fmt(fourWeekRehab)} mi</p><p className="mt-1 text-xs text-zinc-500">Rehab run/walk</p></div>
-                <div><p className="text-xl font-semibold">{fmt(fourWeekVert, 0)} ft</p><p className="mt-1 text-xs text-zinc-500">Running + walking vert</p></div>
+                <div><p className="text-xl font-semibold">{fmt(fourWeekVert, 0)} ft</p><p className="mt-1 text-xs text-zinc-500">Climbing on foot</p></div>
                 <div><p className="text-xl font-semibold">{asHoursMinutes(fourWeeks.reduce((sum, week) => sum + week.aerobicSeconds, 0))}</p><p className="mt-1 text-xs text-zinc-500">Total aerobic time</p></div>
               </div>
+              <p className="mt-4 text-xs text-zinc-500">Cycling vertical (separate): {fmt(fourWeekBikeVert, 0)} ft</p>
             </section>
             <p className="mt-5 text-[11px] leading-5 text-zinc-500">Only non-test activities are included. Legacy “aerobic” sessions are treated as runs unless their notes identify a different activity. Rehab run/walk stays separate. Unknown elevation is not estimated. If a history entry is misclassified, correct its activity type rather than its planned workout.</p>
           </>
@@ -353,10 +384,11 @@ export default function AnalyticsPage() {
         <div className="mx-auto grid max-w-md grid-cols-4 px-2 py-2">
           <Link href="/" className="flex flex-col items-center gap-1 py-2 text-xs text-zinc-500"><span>●</span><span>Today</span></Link>
           <Link href="/week" className="flex flex-col items-center gap-1 py-2 text-xs text-zinc-500"><span>□</span><span>Week</span></Link>
-          <Link href="/history" className="flex flex-col items-center gap-1 py-2 text-xs text-emerald-400"><span>◉</span><span>History</span></Link>
+          <Link href="/history" className="flex flex-col items-center gap-1 py-2 text-xs text-zinc-500"><span>◉</span><span>History</span></Link>
           <Link href="/analytics" className="flex flex-col items-center gap-1 py-2 text-xs text-emerald-400"><span>▥</span><span>Analytics</span></Link>
         </div>
       </nav>
     </div>
   );
 }
+
