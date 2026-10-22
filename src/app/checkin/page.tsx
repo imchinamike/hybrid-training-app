@@ -296,9 +296,9 @@ export default function CheckinPage() {
 
           <ScoreSelector
             label="Knee / injury"
-            description="How does the area you're monitoring feel today?"
-            lowLabel="Significant"
-            highLabel="Normal"
+            description="How does the area you're monitoring feel today? A lower score means more symptoms."
+            lowLabel="1 - Severe symptoms"
+            highLabel="5 - Fresh / no symptoms"
             value={injuryStatus}
             onChange={setInjuryStatus}
           />
