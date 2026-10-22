@@ -86,8 +86,13 @@ export default function CardioLogPage() {
   const [prescriptions, setPrescriptions] =
     useState<CardioPrescription[]>([]);
 
-  const [durationMinutes, setDurationMinutes] =
-    useState("");
+  const [durationHours, setDurationHours] = useState("0");
+  const [durationMinutes, setDurationMinutes] = useState("");
+  const [durationSeconds, setDurationSeconds] = useState("0");
+
+  // Manual ascent/descent works for both outdoor and indoor sessions.
+  const [elevationGainFeet, setElevationGainFeet] = useState("");
+  const [elevationLossFeet, setElevationLossFeet] = useState("");
 
   const [distanceMiles, setDistanceMiles] =
     useState("");
@@ -253,8 +258,16 @@ export default function CardioLogPage() {
   async function finishSession() {
     if (!workout) return;
 
-    const parsedDuration =
-      Number(durationMinutes);
+    const validWholeNumber = (value: string) =>
+      /^\d+$/.test(value.trim());
+    const hoursValid = validWholeNumber(durationHours);
+    const minutesValid = validWholeNumber(durationMinutes);
+    const secondsValid = validWholeNumber(durationSeconds);
+    const parsedHours = Number(durationHours);
+    const parsedMinutes = Number(durationMinutes);
+    const parsedSeconds = Number(durationSeconds);
+    const totalDurationSeconds =
+      parsedHours * 3600 + parsedMinutes * 60 + parsedSeconds;
 
     const parsedRpe =
       Number(sessionRpe);
@@ -280,13 +293,19 @@ export default function CardioLogPage() {
         ? null
         : Number(averageHeartRate);
 
+    const parsedElevationGain = elevationGainFeet.trim() === ""
+      ? null : Number(elevationGainFeet);
+    const parsedElevationLoss = elevationLossFeet.trim() === ""
+      ? null : Number(elevationLossFeet);
+
     if (
-      durationMinutes.trim() === "" ||
-      !Number.isFinite(parsedDuration) ||
-      parsedDuration <= 0
+      !hoursValid || !minutesValid || !secondsValid ||
+      parsedMinutes > 59 || parsedSeconds > 59 ||
+      !Number.isSafeInteger(totalDurationSeconds) ||
+      totalDurationSeconds <= 0
     ) {
       setErrorMessage(
-        "Enter the actual session duration before finishing."
+        "Enter a valid duration (hours, minutes 0–59, seconds 0–59)."
       );
       return;
     }
@@ -326,6 +345,16 @@ export default function CardioLogPage() {
       setErrorMessage(
         "Enter a valid average heart rate."
       );
+      return;
+    }
+
+    if (
+      (parsedElevationGain != null &&
+        (!Number.isFinite(parsedElevationGain) || parsedElevationGain < 0)) ||
+      (parsedElevationLoss != null &&
+        (!Number.isFinite(parsedElevationLoss) || parsedElevationLoss < 0))
+    ) {
+      setErrorMessage("Enter non-negative elevation values in feet.");
       return;
     }
 
@@ -415,10 +444,11 @@ export default function CardioLogPage() {
         source: "app",
         start_time:
           new Date().toISOString(),
-        duration_seconds:
-          Math.round(
-            parsedDuration * 60
-          ),
+        duration_seconds: totalDurationSeconds,
+        elevation_gain_meters: parsedElevationGain == null
+          ? null : parsedElevationGain * 0.3048,
+        elevation_loss_meters: parsedElevationLoss == null
+          ? null : parsedElevationLoss * 0.3048,
         distance_meters:
           distanceMeters,
         average_heart_rate:
@@ -702,31 +732,34 @@ export default function CardioLogPage() {
             </p>
           )}
 
-          <label className="mt-5 block">
-            <span className="text-xs font-medium text-zinc-400">
-              Actual duration
-            </span>
-
-            <div className="mt-2 flex items-center gap-2">
-              <input
-                type="number"
-                inputMode="numeric"
-                min="1"
-                value={durationMinutes}
-                onChange={(event) =>
-                  setDurationMinutes(
-                    event.target.value
-                  )
-                }
-                className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-base outline-none focus:border-emerald-500"
-                placeholder="Minutes"
-              />
-
-              <span className="text-sm text-zinc-500">
-                min
-              </span>
+          <div className="mt-5">
+            <p className="text-xs font-medium text-zinc-400">Actual duration</p>
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              {([
+                { label: "Hours", value: durationHours, setter: setDurationHours },
+                { label: "Minutes", value: durationMinutes, setter: setDurationMinutes },
+                { label: "Seconds", value: durationSeconds, setter: setDurationSeconds },
+              ] as const).map(({ label, value, setter }) => (
+                <label key={label} className="block min-w-0">
+                  <span className="mb-1 block text-[11px] text-zinc-500">{label}</span>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min="0"
+                    max={label === "Hours" ? undefined : "59"}
+                    step="1"
+                    value={value}
+                    onChange={(event) => setter(event.target.value)}
+                    className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-3 text-base outline-none focus:border-emerald-500"
+                    placeholder="0"
+                  />
+                </label>
+              ))}
             </div>
-          </label>
+            <p className="mt-2 text-[10px] text-zinc-600">
+              Enter the actual elapsed time, including seconds.
+            </p>
+          </div>
 
           <label className="mt-5 block">
             <span className="text-xs font-medium text-zinc-400">
@@ -760,6 +793,32 @@ export default function CardioLogPage() {
               </span>
             </div>
           </label>
+
+          <div className="mt-5">
+            <p className="text-xs font-medium text-zinc-400">Elevation (optional)</p>
+            <p className="mt-1 text-[10px] leading-5 text-zinc-600">
+              Record total climbing and descending in feet. Use for trail runs,
+              treadmill inclines, hiking, or stair workouts. Leave blank if unknown.
+            </p>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <label className="block min-w-0">
+                <span className="mb-1 block text-[11px] text-zinc-400">Gain · ft</span>
+                <input type="number" inputMode="decimal" min="0" step="1"
+                  value={elevationGainFeet}
+                  onChange={(event) => setElevationGainFeet(event.target.value)}
+                  placeholder="e.g. 1200"
+                  className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-3 text-base outline-none focus:border-emerald-500" />
+              </label>
+              <label className="block min-w-0">
+                <span className="mb-1 block text-[11px] text-zinc-400">Loss · ft</span>
+                <input type="number" inputMode="decimal" min="0" step="1"
+                  value={elevationLossFeet}
+                  onChange={(event) => setElevationLossFeet(event.target.value)}
+                  placeholder="e.g. 1200"
+                  className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-3 text-base outline-none focus:border-emerald-500" />
+              </label>
+            </div>
+          </div>
 
           <label className="mt-5 block">
             <span className="text-xs font-medium text-zinc-400">
