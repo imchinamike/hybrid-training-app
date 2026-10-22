@@ -201,7 +201,7 @@ function getProposedWeight(
   );
 }
 
-export function getStrengthProgressionRecommendation(
+function calculateStrengthProgressionRecommendation(
   prescription: StrengthPrescription,
   completedSets: CompletedStrengthSet[]
 ): StrengthProgressionRecommendation {
@@ -799,5 +799,81 @@ export function getStrengthProgressionRecommendation(
             null
           ),
       },
+  };
+}
+
+/** Optional exercise-specific equipment rules. Weight values are pounds. */
+export type StrengthEquipmentLimits = {
+  maxWeight?: number | null;
+};
+
+/**
+ * Preserve the original training-performance logic, then enforce equipment
+ * limits before returning recommendations to the UI or apply workflow.
+ */
+export function getStrengthProgressionRecommendation(
+  prescription: StrengthPrescription,
+  completedSets: CompletedStrengthSet[],
+  equipment: StrengthEquipmentLimits = {}
+): StrengthProgressionRecommendation {
+  const result = calculateStrengthProgressionRecommendation(
+    prescription,
+    completedSets
+  );
+
+  const maxWeight = equipment.maxWeight;
+  if (
+    maxWeight == null ||
+    !Number.isFinite(maxWeight) ||
+    maxWeight <= 0
+  ) {
+    return result;
+  }
+
+  const proposed = result.proposedPrescription.targetWeight;
+  if (proposed == null || proposed <= maxWeight) {
+    return result;
+  }
+
+  const cappedPrescription = {
+    ...result.proposedPrescription,
+    targetWeight: maxWeight,
+    suggestedRepTarget:
+      result.action === "increase_load" &&
+      prescription.repsMax != null &&
+      prescription.repsMax > (prescription.repsMin ?? 0)
+        ? prescription.repsMax
+        : result.proposedPrescription.suggestedRepTarget,
+  };
+
+  // A proposed increase beyond available equipment is not a load increase.
+  // Keep the current load and recommend reps, control, or a future substitution.
+  if (result.action === "increase_load") {
+    return {
+      ...result,
+      action:
+        prescription.repsMax != null &&
+        prescription.repsMax > (prescription.repsMin ?? 0)
+          ? "increase_reps"
+          : "hold",
+      reason:
+        `The proposed load exceeds your ${maxWeight} lb equipment limit. ` +
+        "Keep the available weight and emphasize quality reps, pauses, or tempo. " +
+        "Consider an approved barbell/cable alternative when ready.",
+      suggestedWeightChange: null,
+      proposedPrescription: cappedPrescription,
+    };
+  }
+
+  // A carried-forward weight above the limit needs an actionable correction.
+  // This is a target adjustment only; it does not overwrite logged sets.
+  return {
+    ...result,
+    action: "reduce_load",
+    reason:
+      `The prescribed/recorded weight exceeds your ${maxWeight} lb ` +
+      "equipment limit. Cap the next prescription at the available weight.",
+    suggestedWeightChange: null,
+    proposedPrescription: cappedPrescription,
   };
 }

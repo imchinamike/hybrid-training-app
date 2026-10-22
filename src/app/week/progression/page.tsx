@@ -1149,7 +1149,16 @@ function ProgressionPreviewContent() {
                   rpe:
                     set.rpe,
                 })
-              )
+              ),
+              {
+                // Household equipment ceiling: 40 lb per dumbbell.
+                // Goblet squats also use a single dumbbell in this program.
+                maxWeight: /dumbbell|goblet squat/i.test(
+                  exerciseMap.get(targetPrescription.exercise_id) ?? ""
+                )
+                  ? 40
+                  : null,
+              }
             );
 
           previewRows.push(
@@ -1843,4 +1852,3 @@ export default function ProgressionPreviewPage() {
     </Suspense>
   );
 }
-
