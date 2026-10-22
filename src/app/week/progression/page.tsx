@@ -1109,30 +1109,14 @@ function ProgressionPreviewContent() {
           const recommendation =
             getStrengthProgressionRecommendation(
               {
-                prescribedSets:
-                  sourcePrescription?.sets ??
-                  targetPrescription.sets ??
-                  0,
-
-                repsMin:
-                  sourcePrescription?.reps_min ??
-                  targetPrescription.reps_min,
-
-                repsMax:
-                  sourcePrescription?.reps_max ??
-                  targetPrescription.reps_max,
-
-                targetRpeMin:
-                  sourcePrescription?.target_rpe_min ??
-                  targetPrescription.target_rpe_min,
-
-                targetRpeMax:
-                  sourcePrescription?.target_rpe_max ??
-                  targetPrescription.target_rpe_max,
-
-                targetWeight:
-                  sourcePrescription?.target_weight ??
-                  targetPrescription.target_weight,
+                // Always present the TARGET week's edited prescription.
+                // Historical work is provided separately as completed sets.
+                prescribedSets: targetPrescription.sets ?? 0,
+                repsMin: targetPrescription.reps_min,
+                repsMax: targetPrescription.reps_max,
+                targetRpeMin: targetPrescription.target_rpe_min,
+                targetRpeMax: targetPrescription.target_rpe_max,
+                targetWeight: targetPrescription.target_weight,
               },
 
               exerciseCompletedSets.map(
@@ -1151,13 +1135,13 @@ function ProgressionPreviewContent() {
                 })
               ),
               {
-                // Household equipment ceiling: 40 lb per dumbbell.
-                // Goblet squats also use a single dumbbell in this program.
-                maxWeight: /dumbbell|goblet squat/i.test(
+                // Exact household dumbbell set, per hand (lb).
+                // Barbell and cable movements have no dumbbell restriction.
+                availableWeights: /dumbbell|goblet squat/i.test(
                   exerciseMap.get(targetPrescription.exercise_id) ?? ""
                 )
-                  ? 40
-                  : null,
+                  ? [5, 10, 20, 25, 30, 35, 40]
+                  : [],
               }
             );
 

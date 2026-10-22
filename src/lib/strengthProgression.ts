@@ -802,78 +802,97 @@ function calculateStrengthProgressionRecommendation(
   };
 }
 
-/** Optional exercise-specific equipment rules. Weight values are pounds. */
+/** Individual dumbbell weights actually available, in pounds. */
 export type StrengthEquipmentLimits = {
-  maxWeight?: number | null;
+  availableWeights?: number[];
 };
 
 /**
- * Preserve the original training-performance logic, then enforce equipment
- * limits before returning recommendations to the UI or apply workflow.
+ * Apply exercise-specific equipment constraints after the existing RPE/rep logic.
+ * Equipment availability is not a performance-based reason to "reduce load".
  */
 export function getStrengthProgressionRecommendation(
   prescription: StrengthPrescription,
   completedSets: CompletedStrengthSet[],
   equipment: StrengthEquipmentLimits = {}
 ): StrengthProgressionRecommendation {
-  const result = calculateStrengthProgressionRecommendation(
-    prescription,
-    completedSets
-  );
+  const result = calculateStrengthProgressionRecommendation(prescription, completedSets);
+  const options = [...new Set((equipment.availableWeights ?? [])
+    .filter((n) => Number.isFinite(n) && n > 0))].sort((a, b) => a - b);
+  if (options.length === 0) return result;
 
-  const maxWeight = equipment.maxWeight;
-  if (
-    maxWeight == null ||
-    !Number.isFinite(maxWeight) ||
-    maxWeight <= 0
-  ) {
-    return result;
-  }
-
+  const maximum = options[options.length - 1];
+  const currentTarget = prescription.targetWeight;
   const proposed = result.proposedPrescription.targetWeight;
-  if (proposed == null || proposed <= maxWeight) {
-    return result;
-  }
+  const maxReps = prescription.repsMax;
+  const minReps = prescription.repsMin;
+  const hasRepRange = minReps != null && maxReps != null && maxReps > minReps;
 
-  const cappedPrescription = {
-    ...result.proposedPrescription,
-    targetWeight: maxWeight,
-    suggestedRepTarget:
-      result.action === "increase_load" &&
-      prescription.repsMax != null &&
-      prescription.repsMax > (prescription.repsMin ?? 0)
-        ? prescription.repsMax
-        : result.proposedPrescription.suggestedRepTarget,
-  };
+  const atCeiling = (weight: number | null) => weight != null && weight >= maximum;
+  const alternativeAdvice =
+    "Keep the available dumbbell and progress reps, control, or tempo. " +
+    "If more load is needed, consider a suitable barbell or cable variation for review; no substitution is automatic.";
 
-  // A proposed increase beyond available equipment is not a load increase.
-  // Keep the current load and recommend reps, control, or a future substitution.
-  if (result.action === "increase_load") {
+  // No performance data: honor the TARGET week rather than dragging over a
+  // prior week's prescription. If it is an unavailable increment, flag it.
+  if (completedSets.length === 0) {
+    if (currentTarget == null || options.includes(currentTarget)) return result;
+    const lower = [...options].reverse().find((n) => n <= currentTarget) ?? options[0];
     return {
       ...result,
-      action:
-        prescription.repsMax != null &&
-        prescription.repsMax > (prescription.repsMin ?? 0)
-          ? "increase_reps"
-          : "hold",
-      reason:
-        `The proposed load exceeds your ${maxWeight} lb equipment limit. ` +
-        "Keep the available weight and emphasize quality reps, pauses, or tempo. " +
-        "Consider an approved barbell/cable alternative when ready.",
+      action: "hold",
+      reason: `The target of ${currentTarget} lb is not in your dumbbell set (${options.join(", ")} lb). ` +
+        `Suggested available load: ${lower} lb. Review the target before training.`,
       suggestedWeightChange: null,
-      proposedPrescription: cappedPrescription,
+      proposedPrescription: { ...result.proposedPrescription, targetWeight: lower },
     };
   }
 
-  // A carried-forward weight above the limit needs an actionable correction.
-  // This is a target adjustment only; it does not overwrite logged sets.
-  return {
-    ...result,
-    action: "reduce_load",
-    reason:
-      `The prescribed/recorded weight exceeds your ${maxWeight} lb ` +
-      "equipment limit. Cap the next prescription at the available weight.",
-    suggestedWeightChange: null,
-    proposedPrescription: cappedPrescription,
-  };
+  if (result.action === "increase_load") {
+    // Use the last weight actually trained, or the target as a fallback.
+    const logged = completedSets.map((s) => s.weight)
+      .filter((v): v is number => v != null && Number.isFinite(v));
+    const base = logged.length ? Math.max(...logged) : currentTarget;
+    if (base == null) return { ...result, action: "hold", suggestedWeightChange: null };
+    const next = options.find((n) => n > base);
+    // Skip unsafe jumps, especially from 10 -> 20 lb. Max automatic step 5 lb.
+    if (next == null || next - base > 5 || atCeiling(base)) {
+      return {
+        ...result,
+        action: "hold",
+        reason: `No appropriate next dumbbell increment above ${base} lb is available. ` + alternativeAdvice,
+        suggestedWeightChange: null,
+        proposedPrescription: {
+          ...result.proposedPrescription,
+          targetWeight: Math.min(base, maximum),
+          suggestedRepTarget: hasRepRange ? maxReps : null,
+        },
+      };
+    }
+    return {
+      ...result,
+      reason: `Next available dumbbell is ${next} lb (from ${base} lb). ` + result.reason,
+      suggestedWeightChange: next - base,
+      proposedPrescription: { ...result.proposedPrescription, targetWeight: next },
+    };
+  }
+
+  // No load increase: never label equipment availability as a training regression.
+  // A prior performance above the home equipment ceiling is not a reason to
+  // carry that unattainable load into the new prescription.
+  if (proposed != null && !options.includes(proposed)) {
+    const lower = [...options].reverse().find((n) => n <= proposed) ?? options[0];
+    const isEquipmentCorrection = currentTarget == null || currentTarget !== lower;
+    return {
+      ...result,
+      action: result.action === "reduce_load" ? "reduce_load" : "hold",
+      reason: isEquipmentCorrection
+        ? `The proposed ${proposed} lb is not an available dumbbell. Review using ${lower} lb instead; ` + alternativeAdvice
+        : result.reason,
+      suggestedWeightChange: result.action === "reduce_load" ? lower - proposed : null,
+      proposedPrescription: { ...result.proposedPrescription, targetWeight: lower },
+    };
+  }
+  return result;
 }
+
