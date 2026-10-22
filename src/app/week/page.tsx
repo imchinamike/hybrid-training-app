@@ -22,6 +22,15 @@ type TrainingWeek = {
   week_emphasis: string | null;
   notes: string | null;
 };
+type RefreshResult = {
+  week_id: number;
+  running_target_miles: number;
+  previous_week_actual_miles: number;
+  injury_status: number | null;
+  provisional: boolean;
+  reason: string;
+};
+
 type Workout = {
   id: number;
   training_week_id: number | null;
@@ -137,6 +146,9 @@ export default function WeekPage() {
     setGeneratingWeek,
   ] =
     useState(false);
+  const [refreshingRunning, setRefreshingRunning] = useState(false);
+  const [refreshResult, setRefreshResult] = useState<RefreshResult | null>(null);
+
   useEffect(() => {
     async function loadProgram() {
       setLoading(true);
@@ -505,6 +517,58 @@ export default function WeekPage() {
       ].id
     );
   }
+  async function refreshRunningTargets() {
+    if (!selectedWeek || refreshingRunning || generatingWeek) return;
+
+    setRefreshingRunning(true);
+    setRefreshResult(null);
+    setErrorMessage("");
+
+    try {
+      const { data, error } = await supabase.rpc(
+        "refresh_base_running_week",
+        { p_target_week_id: selectedWeek.id }
+      );
+
+      if (error) throw error;
+      if (!data || typeof data !== "object" || Array.isArray(data)) {
+        throw new Error("Refresh completed but returned an unexpected result.");
+      }
+      const result = data as RefreshResult;
+
+      // Reload the saved week and workouts, rather than guessing at updated data.
+      const { data: weekData, error: weekError } = await supabase
+        .from("training_weeks")
+        .select("id, training_block_id, week_number, start_date, planned_run_minutes, planned_run_miles, planned_vertical_ft, planned_training_minutes, week_emphasis, notes")
+        .eq("id", selectedWeek.id)
+        .single();
+      if (weekError || !weekData) {
+        throw new Error(weekError?.message ?? "Updated week could not be reloaded.");
+      }
+
+      const { data: workoutData, error: workoutError } = await supabase
+        .from("planned_workouts")
+        .select("id, training_week_id, planned_date, name, workout_type, requirement_level, priority_level, estimated_duration_min, status")
+        .eq("training_week_id", selectedWeek.id)
+        .order("planned_date", { ascending: true })
+        .order("id", { ascending: true });
+      if (workoutError) throw workoutError;
+
+      setTrainingWeeks((weeks) => weeks.map((week) =>
+        week.id === selectedWeek.id ? (weekData as TrainingWeek) : week
+      ));
+      setWorkouts((current) => [
+        ...current.filter((workout) => workout.training_week_id !== selectedWeek.id),
+        ...((workoutData ?? []) as Workout[]),
+      ]);
+      setRefreshResult(result);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Could not refresh running targets.");
+    } finally {
+      setRefreshingRunning(false);
+    }
+  }
+
   async function generateNextWeek() {
     if (
       !selectedWeek ||
@@ -892,6 +956,48 @@ export default function WeekPage() {
                       }`}
                 </button>
               </section>
+               {/* Running progression refresh */}
+               {selectedWeek.week_number >= 7 &&
+                 selectedWeek.start_date > todayDate && (
+                 <section className="mb-5 rounded-2xl border border-emerald-900/70 bg-emerald-950/20 p-4">
+                   <p className="text-[9px] font-semibold uppercase tracking-widest text-emerald-400">
+                     Running progression
+                   </p>
+                   <h2 className="mt-2 text-sm font-semibold text-zinc-100">
+                     Refresh running targets
+                   </h2>
+                   <p className="mt-1 text-xs leading-5 text-zinc-400">
+                     Recalculate this future week from last week&apos;s recorded runs,
+                     cycling substitutions, and injury check-ins. Strength workouts
+                     and completed activities will not be changed.
+                   </p>
+                   <button
+                     type="button"
+                     onClick={() => void refreshRunningTargets()}
+                     disabled={refreshingRunning || generatingWeek}
+                     className="mt-4 w-full rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-400 disabled:opacity-50"
+                   >
+                     {refreshingRunning ? "Refreshing..." : "Refresh Running Targets"}
+                   </button>
+                   {refreshResult?.week_id === selectedWeek.id && (
+                     <div className="mt-4 rounded-xl border border-emerald-800 bg-zinc-950 p-3" role="status">
+                       <p className="text-sm font-semibold text-emerald-400">
+                         Updated target: {refreshResult.running_target_miles} miles
+                       </p>
+                       <p className="mt-1 text-xs text-zinc-400">
+                         Previous week: {refreshResult.previous_week_actual_miles} miles recorded
+                         {refreshResult.injury_status !== null
+                           ? ` · Injury readiness: ${refreshResult.injury_status}/5`
+                           : " · Injury readiness unavailable"}
+                       </p>
+                       <p className="mt-1 text-xs text-zinc-400">
+                         {refreshResult.provisional ? "Provisional plan" : "Updated plan"}
+                         {` · ${refreshResult.reason}`}
+                       </p>
+                     </div>
+                   )}
+                 </section>
+               )}
               {/* Week emphasis */}
               {(selectedWeek.week_emphasis ||
                 selectedWeek.notes) && (
