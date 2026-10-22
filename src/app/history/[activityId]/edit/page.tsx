@@ -10,6 +10,8 @@ type Activity = {
   activity_type: string;
   duration_seconds: number | null;
   distance_meters: number | null;
+  elevation_gain_meters: number | null;
+  elevation_loss_meters: number | null;
   average_heart_rate: number | null;
   session_rpe: number | null;
   notes: string | null;
@@ -21,6 +23,7 @@ type PlannedWorkout = {
 };
 
 const METERS_PER_MILE = 1609.344;
+const METERS_PER_FOOT = 0.3048;
 
 function getEditableNotes(notes: string | null) {
   if (!notes) return "";
@@ -50,8 +53,12 @@ export default function EditActivityPage() {
   const [workout, setWorkout] =
     useState<PlannedWorkout | null>(null);
 
-  const [durationMinutes, setDurationMinutes] =
-    useState("");
+  const [durationHours, setDurationHours] = useState("0");
+  const [durationMinutes, setDurationMinutes] = useState("");
+  const [durationSeconds, setDurationSeconds] = useState("0");
+
+  const [elevationGainFeet, setElevationGainFeet] = useState("");
+  const [elevationLossFeet, setElevationLossFeet] = useState("");
 
   const [distanceMiles, setDistanceMiles] =
     useState("");
@@ -99,6 +106,8 @@ export default function EditActivityPage() {
           activity_type,
           duration_seconds,
           distance_meters,
+          elevation_gain_meters,
+          elevation_loss_meters,
           average_heart_rate,
           session_rpe,
           notes
@@ -124,13 +133,10 @@ export default function EditActivityPage() {
       if (
         loadedActivity.duration_seconds != null
       ) {
-        setDurationMinutes(
-          String(
-            Math.round(
-              loadedActivity.duration_seconds / 60
-            )
-          )
-        );
+        const totalSeconds = loadedActivity.duration_seconds;
+        setDurationHours(String(Math.floor(totalSeconds / 3600)));
+        setDurationMinutes(String(Math.floor((totalSeconds % 3600) / 60)));
+        setDurationSeconds(String(totalSeconds % 60));
       }
 
       if (
@@ -141,6 +147,18 @@ export default function EditActivityPage() {
             loadedActivity.distance_meters /
             METERS_PER_MILE
           ).toFixed(2)
+        );
+      }
+
+      if (loadedActivity.elevation_gain_meters != null) {
+        setElevationGainFeet(
+          String(Math.round(loadedActivity.elevation_gain_meters / METERS_PER_FOOT))
+        );
+      }
+
+      if (loadedActivity.elevation_loss_meters != null) {
+        setElevationLossFeet(
+          String(Math.round(loadedActivity.elevation_loss_meters / METERS_PER_FOOT))
         );
       }
 
@@ -218,8 +236,17 @@ export default function EditActivityPage() {
   async function saveChanges() {
     if (!activity) return;
 
-    const parsedDuration =
-      Number(durationMinutes);
+    const parsedHours = Number(durationHours);
+    const parsedMinutes = Number(durationMinutes);
+    const parsedSeconds = Number(durationSeconds);
+    const durationParts = [parsedHours, parsedMinutes, parsedSeconds];
+    const parsedDurationSeconds =
+      parsedHours * 3600 + parsedMinutes * 60 + parsedSeconds;
+
+    const parsedGainFeet = elevationGainFeet.trim() === ""
+      ? null : Number(elevationGainFeet);
+    const parsedLossFeet = elevationLossFeet.trim() === ""
+      ? null : Number(elevationLossFeet);
 
     const parsedDistance =
       distanceMiles.trim() === ""
@@ -235,9 +262,11 @@ export default function EditActivityPage() {
       Number(sessionRpe);
 
     if (
-      durationMinutes.trim() === "" ||
-      !Number.isFinite(parsedDuration) ||
-      parsedDuration <= 0
+      durationParts.some((value) => !Number.isSafeInteger(value) || value < 0) ||
+      parsedMinutes > 59 ||
+      parsedSeconds > 59 ||
+      !Number.isSafeInteger(parsedDurationSeconds) ||
+      parsedDurationSeconds <= 0
     ) {
       setErrorMessage(
         "Enter a valid duration."
@@ -283,6 +312,13 @@ export default function EditActivityPage() {
       return;
     }
 
+    if ([parsedGainFeet, parsedLossFeet].some(
+      (value) => value != null && (!Number.isFinite(value) || value < 0)
+    )) {
+      setErrorMessage("Elevation gain and loss must be nonnegative numbers.");
+      return;
+    }
+
     setSaving(true);
     setErrorMessage("");
     setSuccessMessage("");
@@ -307,12 +343,12 @@ export default function EditActivityPage() {
     const { error } = await supabase
       .from("activities")
       .update({
-        duration_seconds:
-          Math.round(
-            parsedDuration * 60
-          ),
-        distance_meters:
-          distanceMeters,
+        duration_seconds: parsedDurationSeconds,
+        distance_meters: distanceMeters,
+        elevation_gain_meters:
+          parsedGainFeet == null ? null : parsedGainFeet * METERS_PER_FOOT,
+        elevation_loss_meters:
+          parsedLossFeet == null ? null : parsedLossFeet * METERS_PER_FOOT,
         average_heart_rate:
           parsedHeartRate,
         session_rpe:
@@ -406,30 +442,30 @@ export default function EditActivityPage() {
         </header>
 
         <section className="mt-6 rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
-          <label className="block">
-            <span className="text-xs font-medium text-zinc-400">
-              Actual duration
-            </span>
-
-            <div className="mt-2 flex items-center gap-2">
-              <input
-                type="number"
-                inputMode="numeric"
-                min="1"
-                value={durationMinutes}
-                onChange={(event) =>
-                  setDurationMinutes(
-                    event.target.value
-                  )
-                }
-                className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-base outline-none focus:border-emerald-500"
-              />
-
-              <span className="text-sm text-zinc-500">
-                min
-              </span>
+          <div>
+            <p className="text-xs font-medium text-zinc-400">Actual duration</p>
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              {([
+                { label: "Hours", value: durationHours, setter: setDurationHours },
+                { label: "Minutes", value: durationMinutes, setter: setDurationMinutes },
+                { label: "Seconds", value: durationSeconds, setter: setDurationSeconds },
+              ] as const).map((field) => (
+                <label key={field.label} className="block">
+                  <span className="text-[10px] text-zinc-500">{field.label}</span>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min="0"
+                    max={field.label === "Hours" ? undefined : "59"}
+                    step="1"
+                    value={field.value}
+                    onChange={(event) => field.setter(event.target.value)}
+                    className="mt-1 w-full min-w-0 rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-3 text-base outline-none focus:border-emerald-500"
+                  />
+                </label>
+              ))}
             </div>
-          </label>
+          </div>
 
           <label className="mt-5 block">
             <span className="text-xs font-medium text-zinc-400">
@@ -460,6 +496,42 @@ export default function EditActivityPage() {
               </span>
             </div>
           </label>
+
+          <div className="mt-5">
+            <p className="text-xs font-medium text-zinc-400">Elevation (optional)</p>
+            <p className="mt-1 text-[10px] text-zinc-600">
+              Enter feet climbed and descended for outdoor or indoor workouts.
+              Leave blank when unknown; enter 0 only when measured as zero.
+            </p>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <label className="block">
+                <span className="text-[10px] text-zinc-500">Gain (ft)</span>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  step="any"
+                  min="0"
+                  value={elevationGainFeet}
+                  onChange={(event) => setElevationGainFeet(event.target.value)}
+                  placeholder="e.g. 1250"
+                  className="mt-1 w-full min-w-0 rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-3 text-base outline-none focus:border-emerald-500"
+                />
+              </label>
+              <label className="block">
+                <span className="text-[10px] text-zinc-500">Loss (ft)</span>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  step="any"
+                  min="0"
+                  value={elevationLossFeet}
+                  onChange={(event) => setElevationLossFeet(event.target.value)}
+                  placeholder="e.g. 850"
+                  className="mt-1 w-full min-w-0 rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-3 text-base outline-none focus:border-emerald-500"
+                />
+              </label>
+            </div>
+          </div>
 
           <label className="mt-5 block">
             <span className="text-xs font-medium text-zinc-400">
