@@ -98,8 +98,12 @@ export default function CardioLogPage() {
   const [sessionRpe, setSessionRpe] =
     useState("");
 
-  const [notes, setNotes] =
-    useState("");
+  const [notes, setNotes] = useState("");
+
+  // The actual activity can differ from the planned workout.
+  const [activityMode, setActivityMode] = useState("running");
+  const [modificationReason, setModificationReason] = useState("");
+  const [otherReason, setOtherReason] = useState("");
 
   const [loading, setLoading] =
     useState(true);
@@ -260,6 +264,17 @@ export default function CardioLogPage() {
         ? null
         : Number(distanceMiles);
 
+    const normalizedReason = modificationReason === "other"
+      ? otherReason.trim()
+      : modificationReason;
+
+    const isChanged = activityMode !== "running" || normalizedReason !== "";
+
+    if (modificationReason === "other" && !normalizedReason) {
+      setErrorMessage("Enter a reason for the modification.");
+      return;
+    }
+
     const parsedHeartRate =
       averageHeartRate.trim() === ""
         ? null
@@ -372,6 +387,8 @@ export default function CardioLogPage() {
 
     const combinedNotes = [
       `Completed planned session: ${workout.name}`,
+      `Actual activity: ${activityMode}`,
+      isChanged ? `Workout modified: ${normalizedReason || "Activity changed"}` : null,
       notes.trim()
         ? notes.trim()
         : null,
@@ -392,7 +409,9 @@ export default function CardioLogPage() {
       .insert({
         athlete_id: athleteData.id,
         activity_type:
-          workout.workout_type,
+          activityMode === "running" ? "aerobic"
+          : activityMode === "indoor_cycling" || activityMode === "outdoor_cycling" ? "cycling"
+          : activityMode === "walking" ? "walking" : "aerobic",
         source: "app",
         start_time:
           new Date().toISOString(),
@@ -531,6 +550,57 @@ export default function CardioLogPage() {
           </p>
         </header>
 
+        <section className="mt-6 rounded-2xl border border-orange-900/70 bg-orange-950/20 p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-orange-400">
+            Modify session on the fly
+          </p>
+          <p className="mt-2 text-xs leading-5 text-zinc-400">
+            Keep the original planned workout, but record what you actually did.
+            Cycling will not count toward running mileage.
+          </p>
+          <label className="mt-4 block text-xs font-medium text-zinc-300" htmlFor="actual-mode">
+            Actual activity
+          </label>
+          <select
+            id="actual-mode"
+            value={activityMode}
+            onChange={(event) => setActivityMode(event.target.value)}
+            className="mt-2 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-3 text-sm"
+          >
+            <option value="running">Running</option>
+            <option value="indoor_cycling">Indoor cycling</option>
+            <option value="outdoor_cycling">Outdoor cycling</option>
+            <option value="walking">Walking</option>
+            <option value="other_aerobic">Other aerobic activity</option>
+          </select>
+          <label className="mt-4 block text-xs font-medium text-zinc-300" htmlFor="mod-reason">
+            Reason for change (optional)
+          </label>
+          <select
+            id="mod-reason"
+            value={modificationReason}
+            onChange={(event) => setModificationReason(event.target.value)}
+            className="mt-2 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-3 text-sm"
+          >
+            <option value="">No change / no reason</option>
+            <option value="knee soreness">Knee soreness</option>
+            <option value="fatigue or recovery">Fatigue / recovery</option>
+            <option value="time or schedule">Time / schedule</option>
+            <option value="equipment availability">Equipment availability</option>
+            <option value="personal preference">Personal preference</option>
+            <option value="other">Other</option>
+          </select>
+          {modificationReason === "other" && (
+            <input
+              type="text"
+              value={otherReason}
+              onChange={(event) => setOtherReason(event.target.value)}
+              placeholder="Why did you change this session?"
+              className="mt-3 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-3 text-sm"
+            />
+          )}
+        </section>
+
         {prescriptions.length > 0 && (
           <section className="mt-6 space-y-3">
             {prescriptions.map(
@@ -664,7 +734,9 @@ export default function CardioLogPage() {
             </span>
 
             <p className="mt-1 text-[10px] text-zinc-600">
-              Optional
+              {activityMode === "running"
+                ? "Optional, but recommended for running progression"
+                : "Optional; never added to running mileage"}
             </p>
 
             <div className="mt-2 flex items-center gap-2">
