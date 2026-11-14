@@ -358,7 +358,16 @@ export default function WeekPage() {
             );
           }
         );
-      if (currentWeek) {
+      // Honor a specific week when returning from a workout detail page.
+      const requestedWeek = Number(
+        new URLSearchParams(window.location.search).get("week")
+      );
+      const linkedWeek = Number.isInteger(requestedWeek) && requestedWeek > 0
+        ? loadedWeeks.find((week) => week.week_number === requestedWeek)
+        : undefined;
+      if (linkedWeek) {
+        setSelectedWeekId(linkedWeek.id);
+      } else if (currentWeek) {
         setSelectedWeekId(
           currentWeek.id
         );
@@ -384,6 +393,24 @@ export default function WeekPage() {
     }
     loadProgram();
   }, []);
+  // Restore the week-list scroll position after returning from a workout.
+  // The position is captured when the workout card is opened and consumed once.
+  useEffect(() => {
+    if (loading || selectedWeekId == null) return;
+    const saved = sessionStorage.getItem("trainingAppWeekReturn");
+    if (!saved) return;
+    try {
+      const state = JSON.parse(saved) as { weekId: number; scrollY: number };
+      if (state.weekId !== selectedWeekId || !Number.isFinite(state.scrollY)) return;
+      sessionStorage.removeItem("trainingAppWeekReturn");
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => window.scrollTo({ top: state.scrollY, behavior: "instant" }));
+      });
+    } catch {
+      sessionStorage.removeItem("trainingAppWeekReturn");
+    }
+  }, [loading, selectedWeekId]);
+
   const selectedWeek =
     useMemo(() => {
       if (
@@ -1171,7 +1198,13 @@ export default function WeekPage() {
                                   key={
                                     workout.id
                                   }
-                                  href={`/workout/${workout.id}`}
+                                  href={`/workout/${workout.id}?from=week&week=${selectedWeek.week_number}`}
+                                  onClick={() => {
+                                    sessionStorage.setItem("trainingAppWeekReturn", JSON.stringify({
+                                      weekId: selectedWeek.id,
+                                      scrollY: window.scrollY,
+                                    }));
+                                  }}
                                   className={`block rounded-xl border p-4 transition ${
                                     isCompleted
                                       ? "border-emerald-900 bg-emerald-950/30 hover:bg-emerald-950/50"
@@ -1299,4 +1332,5 @@ export default function WeekPage() {
     </div>
   );
 }
+
 

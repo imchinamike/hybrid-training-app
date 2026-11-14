@@ -5,6 +5,10 @@ type Props = {
   params: Promise<{
     id: string;
   }>;
+  searchParams: Promise<{
+    from?: string;
+    week?: string;
+  }>;
 };
 
 type WorkoutComponent = {
@@ -226,8 +230,14 @@ function formatWatchSegment(
 
 export default async function WorkoutDetailPage({
   params,
+  searchParams,
 }: Props) {
   const { id } = await params;
+  const { from, week } = await searchParams;
+  const requestedWeek = Number(week);
+  const returningToWeek = from === "week" && Number.isInteger(requestedWeek) && requestedWeek > 0;
+  const backHref = returningToWeek ? `/week?week=${requestedWeek}` : "/";
+  const backLabel = returningToWeek ? `← Week ${requestedWeek}` : "← Today";
 
   const { data: workout, error: workoutError } =
     await supabase
@@ -406,10 +416,10 @@ export default async function WorkoutDetailPage({
     <main className="min-h-screen bg-zinc-950 px-4 pb-24 pt-8 text-zinc-100">
       <div className="mx-auto w-full max-w-md">
         <Link
-          href="/"
+          href={backHref}
           className="text-sm font-medium text-emerald-400"
         >
-          ← Today
+          {backLabel}
         </Link>
 
         <header className="mt-6">
