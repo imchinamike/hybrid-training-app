@@ -1137,7 +1137,7 @@ function ProgressionPreviewContent() {
               {
                 // Exact household dumbbell set, per hand (lb).
                 // Barbell and cable movements have no dumbbell restriction.
-                availableWeights: /dumbbell|goblet squat/i.test(
+                availableWeights: /dumbbell|\bdb\b|goblet squat/i.test(
                   exerciseMap.get(targetPrescription.exercise_id) ?? ""
                 )
                   ? [5, 10, 20, 25, 30, 35, 40]
