@@ -448,6 +448,25 @@ export default async function WorkoutDetailPage({
           </p>
         </header>
 
+        {/* Quick access to the same logging screens as the buttons below. */}
+        {hasStrengthDetails && !isCompleted && (
+          <Link
+            href={`/workout/${workout.id}/log`}
+            className="mt-5 block w-full rounded-xl bg-emerald-500 py-4 text-center text-sm font-semibold text-zinc-950 transition hover:bg-emerald-400"
+          >
+            Start workout
+          </Link>
+        )}
+
+        {hasCardioDetails && !hasStrengthDetails && !isCompleted && (
+          <Link
+            href={`/workout/${workout.id}/cardio-log`}
+            className="mt-5 block w-full rounded-xl bg-emerald-500 py-4 text-center text-sm font-semibold text-zinc-950 transition hover:bg-emerald-400"
+          >
+            Log session
+          </Link>
+        )}
+
         {workout.coaching_intent && (
           <section className="mt-6 rounded-xl border border-zinc-800 bg-zinc-900 p-4">
             <p className="text-[10px] uppercase tracking-wide text-zinc-500">
